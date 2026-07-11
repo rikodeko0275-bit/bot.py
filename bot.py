@@ -1,7 +1,10 @@
 import os
-from telegram.ext import Application
 
 TOKEN = os.getenv("BOT_TOKEN")
+
+print("TOKEN:", TOKEN)
+
+from telegram.ext import Application
 
 app = Application.builder().token(TOKEN).build()
 
