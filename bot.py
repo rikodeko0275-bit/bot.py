@@ -40,6 +40,7 @@ def get_btc_price():
 
     return float(data["bitcoin"]["usd"])
 
+
 def get_market_data():
     url = (
         "https://api.coingecko.com/api/v3/coins/"
@@ -65,7 +66,6 @@ def get_market_data():
         prices.append(float(item[1]))
 
     return pd.Series(prices)
-
 
 def calculate_rsi(prices, period=14):
     delta = prices.diff()
@@ -244,12 +244,6 @@ async def predict(
         )
 
     except Exception as e:
-    if "429" in str(e):
-        await update.message.reply_text(
-            "⏳ API уақытша шектелді.\n"
-            "1-2 минуттан кейін қайта көріңіз."
-        )
-    else:
         await update.message.reply_text(
             f"Қате:\n{e}"
         )
