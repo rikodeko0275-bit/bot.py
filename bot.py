@@ -23,26 +23,11 @@ TIMEFRAMES = {
 
 
 def get_btc_price():
-    try:
-        url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+    url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
 
-        response = requests.get(url, timeout=10)
+    data = requests.get(url, timeout=10).json()
 
-        print("Status:", response.status_code)
-        print("Text:", response.text)
-
-        data = response.json()
-
-        if response.status_code != 200:
-            raise Exception(f"HTTP {response.status_code}: {data}")
-
-        if "price" not in data:
-            raise Exception(f"API жауабы: {data}")
-
-        return float(data["price"])
-
-    except Exception as e:
-        raise Exception(str(e))
+    return float(data["bitcoin"]["usd"])
         
 
 def generate_prediction():
