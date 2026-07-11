@@ -21,10 +21,7 @@ def now_kz():
 
 
 def get_btc_price():
-    url = (
-        "https://api.coingecko.com/api/v3/"
-        "simple/price?ids=bitcoin&vs_currencies=usd"
-    )
+    url = "https://api.coingecko.com/api/v3/simple/price?ids=bitcoin&vs_currencies=usd"
 
     response = requests.get(
         url,
@@ -94,52 +91,51 @@ def ai_predict():
 
     rsi = calculate_rsi(prices)
 
-    up_score = 0
-    down_score = 0
+    up = 50
+    down = 50
 
     reasons = []
 
     if ema20 > ema50:
-        up_score += 2
+        up += 15
+        down -= 15
         reasons.append("EMA20 > EMA50")
     else:
-        down_score += 2
+        down += 15
+        up -= 15
         reasons.append("EMA20 < EMA50")
 
-    if rsi < 30:
-        up_score += 2
-        reasons.append("RSI Oversold")
-    elif rsi > 70:
-        down_score += 2
-        reasons.append("RSI Overbought")
-
     if prices.iloc[-1] > prices.iloc[-2]:
-        up_score += 1
+        up += 10
+        down -= 10
         reasons.append("Price Momentum UP")
     else:
-        down_score += 1
+        down += 10
+        up -= 10
         reasons.append("Price Momentum DOWN")
 
-    if up_score > down_score:
-        prediction = "🟢 UP"
-    elif down_score > up_score:
-        prediction = "🔴 DOWN"
-    else:
-        prediction = "🟡 SIDEWAYS"
+    if rsi < 30:
+        up += 10
+        reasons.append("RSI Oversold")
 
-    total = up_score + down_score
+    elif rsi > 70:
+        down += 10
+        reasons.append("RSI Overbought")
 
-    if total == 0:
-        up = 50
-        down = 50
-    else:
-        up = round(up_score / total * 100)
-        down = round(down_score / total * 100)
+    up = max(5, min(up, 95))
+    down = max(5, min(down, 95))
 
     sideways = max(
         0,
         100 - up - down
     )
+
+    if up > down and up > sideways:
+        prediction = "🟢 UP"
+    elif down > up and down > sideways:
+        prediction = "🔴 DOWN"
+    else:
+        prediction = "🟡 SIDEWAYS"
 
     return {
         "prediction": prediction,
@@ -154,9 +150,11 @@ def ai_predict():
     }
 
 
-async def start(update: Update,
-                context: ContextTypes.DEFAULT_TYPE):
-    await update.message.reply_text(
+async def start(
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE):
+
+    text = (
         "🤖 Deko Trade Predictor Bot\n\n"
         "/price - BTC бағасы\n"
         "/predict - AI болжамы\n"
@@ -164,9 +162,13 @@ async def start(update: Update,
         "/stats - Статистика"
     )
 
+    await update.message.reply_text(text)
 
-async def price(update: Update,
-                context: ContextTypes.DEFAULT_TYPE):
+
+async def price(
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE):
+
     try:
         price = get_btc_price()
 
@@ -181,8 +183,10 @@ async def price(update: Update,
         )
 
 
-async def predict(update: Update,
-                  context: ContextTypes.DEFAULT_TYPE):
+async def predict(
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE):
+
     global active_prediction
 
     try:
@@ -196,12 +200,9 @@ async def predict(update: Update,
         )
 
         active_prediction = {
-            "prediction":
-                result["prediction"],
-            "start_price":
-                result["price"],
-            "end_time":
-                end_time
+            "prediction": result["prediction"],
+            "start_price": result["price"],
+            "end_time": end_time
         }
 
         reasons = "\n".join(
@@ -212,16 +213,21 @@ async def predict(update: Update,
             f"₿ BTC/USDT\n\n"
             f"Current Price: "
             f"${result['price']:,.2f}\n\n"
+
             f"EMA20: {result['ema20']}\n"
             f"EMA50: {result['ema50']}\n"
             f"RSI: {result['rsi']}\n\n"
+
             f"UP: {result['up']}%\n"
             f"DOWN: {result['down']}%\n"
             f"SIDEWAYS: {result['sideways']}%\n\n"
+
             f"Prediction:\n"
             f"{result['prediction']}\n\n"
+
             f"AI Analysis:\n"
             f"{reasons}\n\n"
+
             f"Valid Until:\n"
             f"{end_time.strftime('%H:%M:%S')}"
         )
@@ -229,9 +235,10 @@ async def predict(update: Update,
         await update.message.reply_text(text)
 
     except Exception as e:
+
         if "429" in str(e):
             await update.message.reply_text(
-                "⏳ CoinGecko уақытша шектеді.\n"
+                "⏳ API уақытша шектелді.\n"
                 "1-2 минуттан кейін қайта көріңіз."
             )
         else:
@@ -240,8 +247,10 @@ async def predict(update: Update,
             )
 
 
-async def check(update: Update,
-                context: ContextTypes.DEFAULT_TYPE):
+async def check(
+        update: Update,
+        context: ContextTypes.DEFAULT_TYPE):
+
     global active_prediction
     global stats
 
@@ -254,6 +263,7 @@ async def check(update: Update,
     now = now_kz()
 
     if now < active_prediction["end_time"]:
+
         remaining = int(
             (
                 active_prediction["end_time"]
@@ -268,7 +278,10 @@ async def check(update: Update,
         return
 
     try:
-        start_price = active_prediction["start_price"]
+        start_price = active_prediction[
+            "start_price"
+        ]
+
         end_price = get_btc_price()
 
         if end_price > start_price:
@@ -278,31 +291,40 @@ async def check(update: Update,
         else:
             actual = "🟡 SIDEWAYS"
 
-        prediction = (
-            active_prediction["prediction"]
-        )
+        prediction = active_prediction[
+            "prediction"
+        ]
 
         stats["total"] += 1
 
         if prediction == actual:
             result = "✅ Correct"
             stats["correct"] += 1
+
         elif actual == "🟡 SIDEWAYS":
             result = "⚪ Neutral"
             stats["neutral"] += 1
+
         else:
             result = "❌ Incorrect"
             stats["incorrect"] += 1
 
-        await update.message.reply_text(
+        text = (
             f"Prediction: {prediction}\n"
             f"Actual: {actual}\n\n"
-            f"Start Price: ${start_price:,.2f}\n"
-            f"End Price: ${end_price:,.2f}\n\n"
+
+            f"Start Price: "
+            f"${start_price:,.2f}\n"
+
+            f"End Price: "
+            f"${end_price:,.2f}\n\n"
+
             f"Result: {result}"
         )
 
         active_prediction = None
+
+        await update.message.reply_text(text)
 
     except Exception as e:
         await update.message.reply_text(
@@ -313,6 +335,7 @@ async def check(update: Update,
 async def stats_command(
         update: Update,
         context: ContextTypes.DEFAULT_TYPE):
+
     total = stats["total"]
 
     accuracy = 0
@@ -325,7 +348,7 @@ async def stats_command(
             2
         )
 
-    await update.message.reply_text(
+    text = (
         "📊 Statistics\n\n"
         f"Total: {stats['total']}\n"
         f"Correct: {stats['correct']}\n"
@@ -334,6 +357,8 @@ async def stats_command(
         f"Accuracy: {accuracy}%"
     )
 
+    await update.message.reply_text(text)
+
 
 app = (
     Application.builder()
@@ -341,11 +366,21 @@ app = (
     .build()
 )
 
-app.add_handler(CommandHandler("start", start))
-app.add_handler(CommandHandler("price", price))
-app.add_handler(CommandHandler("predict", predict))
-app.add_handler(CommandHandler("check", check))
-app.add_handler(CommandHandler("stats", stats_command))
+app.add_handler(
+    CommandHandler("start", start)
+)
+app.add_handler(
+    CommandHandler("price", price)
+)
+app.add_handler(
+    CommandHandler("predict", predict)
+)
+app.add_handler(
+    CommandHandler("check", check)
+)
+app.add_handler(
+    CommandHandler("stats", stats_command)
+)
 
 print("Bot started...")
 app.run_polling()
