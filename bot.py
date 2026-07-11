@@ -8,6 +8,9 @@ import requests
 import pandas as pd
 from datetime import datetime, timedelta
 
+TIME_OFFSET = 5
+
+
 TOKEN = "8807056466:AAH8g7hz1n3i9DTeePDAALiM-yRV6z7PCnc"
 
 active_prediction = None
@@ -198,8 +201,8 @@ async def predict(
         result = ai_predict()
 
         end_time = (
-            datetime.now()
-            + timedelta(minutes=5)
+            datetime.utcnow() + timedelta(hours=TIME_OFFSET)
+            + timedelta(minutes=1)
         )
 
         active_prediction = {
