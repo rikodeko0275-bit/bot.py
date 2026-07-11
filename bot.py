@@ -1,15 +1,8 @@
 from telegram import Update
-from telegram.ext import (
-    Application,
-    CommandHandler,
-    ContextTypes
-)
+from telegram.ext import Application, CommandHandler, ContextTypes
 import requests
 import pandas as pd
 from datetime import datetime, timedelta
-
-TIME_OFFSET = 5
-
 
 TOKEN = "8807056466:AAH8g7hz1n3i9DTeePDAALiM-yRV6z7PCnc"
 
@@ -23,6 +16,10 @@ stats = {
 }
 
 
+def now_kz():
+    return datetime.utcnow() + timedelta(hours=5)
+
+
 def get_btc_price():
     url = (
         "https://api.coingecko.com/api/v3/"
@@ -32,9 +29,7 @@ def get_btc_price():
     response = requests.get(
         url,
         timeout=20,
-        headers={
-            "User-Agent": "Mozilla/5.0"
-        }
+        headers={"User-Agent": "Mozilla/5.0"}
     )
 
     response.raise_for_status()
@@ -46,17 +41,15 @@ def get_btc_price():
 
 def get_market_data():
     url = (
-        "https://api.coingecko.com/api/v3/coins/"
-        "bitcoin/market_chart"
+        "https://api.coingecko.com/api/v3/"
+        "coins/bitcoin/market_chart"
         "?vs_currency=usd&days=1&interval=hourly"
     )
 
     response = requests.get(
         url,
         timeout=20,
-        headers={
-            "User-Agent": "Mozilla/5.0"
-        }
+        headers={"User-Agent": "Mozilla/5.0"}
     )
 
     response.raise_for_status()
@@ -69,6 +62,7 @@ def get_market_data():
         prices.append(float(item[1]))
 
     return pd.Series(prices)
+
 
 def calculate_rsi(prices, period=14):
     delta = prices.diff()
@@ -160,23 +154,19 @@ def ai_predict():
     }
 
 
-async def start(
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-):
+async def start(update: Update,
+                context: ContextTypes.DEFAULT_TYPE):
     await update.message.reply_text(
         "🤖 Deko Trade Predictor Bot\n\n"
         "/price - BTC бағасы\n"
         "/predict - AI болжамы\n"
-        "/check - Тексеру\n"
+        "/check - Нәтижені тексеру\n"
         "/stats - Статистика"
     )
 
 
-async def price(
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-):
+async def price(update: Update,
+                context: ContextTypes.DEFAULT_TYPE):
     try:
         price = get_btc_price()
 
@@ -191,18 +181,18 @@ async def price(
         )
 
 
-async def predict(
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-):
+async def predict(update: Update,
+                  context: ContextTypes.DEFAULT_TYPE):
     global active_prediction
 
     try:
         result = ai_predict()
 
+        now = now_kz()
+
         end_time = (
-            datetime.utcnow() + timedelta(hours=TIME_OFFSET)
-            + timedelta(minutes=1)
+            now
+            + timedelta(minutes=5)
         )
 
         active_prediction = {
@@ -222,18 +212,12 @@ async def predict(
             f"₿ BTC/USDT\n\n"
             f"Current Price: "
             f"${result['price']:,.2f}\n\n"
-            f"EMA20: "
-            f"{result['ema20']}\n"
-            f"EMA50: "
-            f"{result['ema50']}\n"
-            f"RSI: "
-            f"{result['rsi']}\n\n"
-            f"UP: "
-            f"{result['up']}%\n"
-            f"DOWN: "
-            f"{result['down']}%\n"
-            f"SIDEWAYS: "
-            f"{result['sideways']}%\n\n"
+            f"EMA20: {result['ema20']}\n"
+            f"EMA50: {result['ema50']}\n"
+            f"RSI: {result['rsi']}\n\n"
+            f"UP: {result['up']}%\n"
+            f"DOWN: {result['down']}%\n"
+            f"SIDEWAYS: {result['sideways']}%\n\n"
             f"Prediction:\n"
             f"{result['prediction']}\n\n"
             f"AI Analysis:\n"
@@ -242,20 +226,22 @@ async def predict(
             f"{end_time.strftime('%H:%M:%S')}"
         )
 
-        await update.message.reply_text(
-            text
-        )
+        await update.message.reply_text(text)
 
     except Exception as e:
-        await update.message.reply_text(
-            f"Қате:\n{e}"
-        )
+        if "429" in str(e):
+            await update.message.reply_text(
+                "⏳ CoinGecko уақытша шектеді.\n"
+                "1-2 минуттан кейін қайта көріңіз."
+            )
+        else:
+            await update.message.reply_text(
+                f"Қате:\n{e}"
+            )
 
 
-async def check(
-        update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-):
+async def check(update: Update,
+                context: ContextTypes.DEFAULT_TYPE):
     global active_prediction
     global stats
 
@@ -265,69 +251,68 @@ async def check(
         )
         return
 
-    if (
-        datetime.now()
-        < active_prediction["end_time"]
-    ):
-        seconds = int(
+    now = now_kz()
+
+    if now < active_prediction["end_time"]:
+        remaining = int(
             (
                 active_prediction["end_time"]
-                - datetime.now()
+                - now
             ).total_seconds()
         )
 
         await update.message.reply_text(
             f"⏳ Қалған уақыт:\n"
-            f"{seconds} секунд"
+            f"{remaining} секунд"
         )
         return
 
-    end_price = get_btc_price()
+    try:
+        start_price = active_prediction["start_price"]
+        end_price = get_btc_price()
 
-    start_price = (
-        active_prediction["start_price"]
-    )
+        if end_price > start_price:
+            actual = "🟢 UP"
+        elif end_price < start_price:
+            actual = "🔴 DOWN"
+        else:
+            actual = "🟡 SIDEWAYS"
 
-    if end_price > start_price:
-        actual = "🟢 UP"
-    elif end_price < start_price:
-        actual = "🔴 DOWN"
-    else:
-        actual = "🟡 SIDEWAYS"
+        prediction = (
+            active_prediction["prediction"]
+        )
 
-    prediction = (
-        active_prediction["prediction"]
-    )
+        stats["total"] += 1
 
-    stats["total"] += 1
+        if prediction == actual:
+            result = "✅ Correct"
+            stats["correct"] += 1
+        elif actual == "🟡 SIDEWAYS":
+            result = "⚪ Neutral"
+            stats["neutral"] += 1
+        else:
+            result = "❌ Incorrect"
+            stats["incorrect"] += 1
 
-    if prediction == actual:
-        result = "✅ Correct"
-        stats["correct"] += 1
-    elif actual == "🟡 SIDEWAYS":
-        result = "⚪ Neutral"
-        stats["neutral"] += 1
-    else:
-        result = "❌ Incorrect"
-        stats["incorrect"] += 1
+        await update.message.reply_text(
+            f"Prediction: {prediction}\n"
+            f"Actual: {actual}\n\n"
+            f"Start Price: ${start_price:,.2f}\n"
+            f"End Price: ${end_price:,.2f}\n\n"
+            f"Result: {result}"
+        )
 
-    await update.message.reply_text(
-        f"Prediction: {prediction}\n"
-        f"Actual: {actual}\n\n"
-        f"Start Price: "
-        f"${start_price:,.2f}\n"
-        f"End Price: "
-        f"${end_price:,.2f}\n\n"
-        f"Result: {result}"
-    )
+        active_prediction = None
 
-    active_prediction = None
+    except Exception as e:
+        await update.message.reply_text(
+            f"Қате:\n{e}"
+        )
 
 
 async def stats_command(
         update: Update,
-        context: ContextTypes.DEFAULT_TYPE
-):
+        context: ContextTypes.DEFAULT_TYPE):
     total = stats["total"]
 
     accuracy = 0
@@ -356,21 +341,11 @@ app = (
     .build()
 )
 
-app.add_handler(
-    CommandHandler("start", start)
-)
-app.add_handler(
-    CommandHandler("price", price)
-)
-app.add_handler(
-    CommandHandler("predict", predict)
-)
-app.add_handler(
-    CommandHandler("check", check)
-)
-app.add_handler(
-    CommandHandler("stats", stats_command)
-)
+app.add_handler(CommandHandler("start", start))
+app.add_handler(CommandHandler("price", price))
+app.add_handler(CommandHandler("predict", predict))
+app.add_handler(CommandHandler("check", check))
+app.add_handler(CommandHandler("stats", stats_command))
 
 print("Bot started...")
 app.run_polling()
