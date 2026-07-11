@@ -51,7 +51,7 @@ def calculate_rsi(prices, period=14):
 
 def ai_predict():
 
-    prices = get_binance_data()
+    prices = get_market_data()
 
     current_price = float(prices.iloc[-1])
 
