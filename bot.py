@@ -17,25 +17,23 @@ def get_btc_price():
     data = requests.get(url, timeout=10).json()
     return float(data["bitcoin"]["usd"])
 
+def get_market_data():
+    url = (
+        "https://api.coingecko.com/api/v3/coins/"
+        "bitcoin/market_chart"
+        "?vs_currency=usd&days=1&interval=minutely"
+    )
 
-def get_binance_data():
-    url = "https://api.binance.com/api/v3/klines?symbol=BTCUSDT&interval=5m&limit=100"
+    data = requests.get(url, timeout=20).json()
 
-    response = requests.get(url, timeout=10)
-
-    if response.status_code != 200:
-        raise Exception("Binance деректерін алу мүмкін болмады.")
-
-    data = response.json()
+    prices = data["prices"]
 
     closes = []
 
-    for candle in data:
-        closes.append(float(candle[4]))
+    for item in prices[-100:]:
+        closes.append(float(item[1]))
 
     return pd.Series(closes)
-
-
 def calculate_rsi(prices, period=14):
     delta = prices.diff()
 
