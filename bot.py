@@ -23,17 +23,27 @@ TIMEFRAMES = {
 
 
 def get_btc_price():
-    url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+    try:
+        url = "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
 
-    response = requests.get(url, timeout=10)
-    data = response.json()
+        response = requests.get(url, timeout=10)
 
-    print(data)
+        print("Status:", response.status_code)
+        print("Text:", response.text)
 
-    if "price" not in data:
-        raise Exception(f"Binance қатесі: {data}")
+        data = response.json()
 
-    return float(data["price"])
+        if response.status_code != 200:
+            raise Exception(f"HTTP {response.status_code}: {data}")
+
+        if "price" not in data:
+            raise Exception(f"API жауабы: {data}")
+
+        return float(data["price"])
+
+    except Exception as e:
+        raise Exception(str(e))
+        
 
 def generate_prediction():
     up = random.randint(35, 65)
