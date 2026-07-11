@@ -192,7 +192,7 @@ async def predict(update: Update,
 
         end_time = (
             now
-            + timedelta(minutes=5)
+            + timedelta(minutes=1)
         )
 
         active_prediction = {
